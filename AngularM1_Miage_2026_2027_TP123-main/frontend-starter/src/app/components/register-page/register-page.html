@@ -1,0 +1,38 @@
+<section class="card">
+  <h1>Créer un compte</h1>
+  <form [formGroup]="form" (ngSubmit)="submit()">
+    <label for="register-name">Nom</label>
+    <input id="register-name" formControlName="name" autocomplete="name" />
+    @if (form.controls.name.touched && form.controls.name.hasError('required')) {
+      <p class="error">Le nom est obligatoire.</p>
+    } @else if (form.controls.name.touched && form.controls.name.hasError('minlength')) {
+      <p class="error">Le nom doit contenir au moins 2 caractères.</p>
+    } @else if (form.controls.name.touched && form.controls.name.hasError('pattern')) {
+      <p class="error">Le nom ne peut pas être composé uniquement d’espaces.</p>
+    }
+
+    <label for="register-email">Adresse e-mail</label>
+    <input id="register-email" type="email" formControlName="email" autocomplete="email" />
+    @if (form.controls.email.touched && form.controls.email.hasError('required')) {
+      <p class="error">L’adresse e-mail est obligatoire.</p>
+    } @else if (form.controls.email.touched && form.controls.email.hasError('email')) {
+      <p class="error">Saisissez une adresse e-mail valide.</p>
+    }
+
+    <label for="register-password">Mot de passe</label>
+    <input id="register-password" type="password" formControlName="password" autocomplete="new-password" />
+    @if (form.controls.password.touched && form.controls.password.hasError('required')) {
+      <p class="error">Le mot de passe est obligatoire.</p>
+    } @else if (form.controls.password.touched && form.controls.password.hasError('minlength')) {
+      <p class="error">Le mot de passe doit contenir au moins 8 caractères.</p>
+    }
+
+    <button type="submit" [disabled]="submitting()">
+      {{ submitting() ? 'Création en cours…' : 'Créer mon compte' }}
+    </button>
+  </form>
+  @if (error(); as message) {
+    <p class="error" role="alert">{{ message }}</p>
+  }
+  <p><a routerLink="/login">Déjà inscrit ?</a></p>
+</section>
