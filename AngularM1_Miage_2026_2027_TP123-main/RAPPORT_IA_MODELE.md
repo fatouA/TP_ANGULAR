@@ -1,4 +1,4 @@
-# Rapport d'usage de l'IA - TP1
+# Rapport d'usage de l'IA - TP1 et TP2
 
 Pour chaque mission, détailler et fournir des explications concernant : objectif; prompt principal; plan proposé par l'agent; vérifications réalisées par le binôme; erreurs ou propositions rejetées; fichiers effectivement modifiés; preuve de fonctionnement; ce que chaque membre sait maintenant expliquer sans l'agent.
 
@@ -137,8 +137,87 @@ Utilisateur
 - Suite de tests indisponible faute d’environnement DOM; build de production réussi. La dépendance manquante n’a pas été installée afin de ne pas élargir le changement.
 
 ### Ce que j’ai compris (à rédiger par l’étudiante)
-### Ce que j’ai compris
 
 J’ai compris comment se déroule l’authentification dans l’application, de l’inscription à la connexion. Lorsqu’un utilisateur s’inscrit ou se connecte, Angular envoie une requête à l’API. Après une connexion réussie, le token JWT est enregistré dans le navigateur pour permettre l’accès aux pages protégées.
 
 J’ai aussi compris que le JWT est envoyé lors des requêtes qui nécessitent une authentification. Enfin, le profil permet de récupérer les informations de l’utilisateur et de modifier son nom grâce au service d’authentification.
+
+---
+
+## Mission 2 — Bibliothèque paginée, upload et lecture audio
+* **Date** : 28 octobre 2026
+* **Outil et modèle** : Copilot SDK dans VS Code — gpt-6-luna.
+* **Objectif** : Vérifier et compléter la pagination serveur, améliorer la validation et les retours d’état de l’upload, puis compléter la lecture audio authentifiée. Dans une étape facultative ultérieure, ajouter un filtre serveur, une suppression confirmée et l’upload d’une image de couverture.
+
+### Prompts principaux
+1. « salut, continuons avec le TP2 que je reprend » puis choix de commencer par un état des lieux du TP2.
+2. « ok donc commençons etape par etape »
+3. Confirmation que les changements de page fonctionnaient et que Network affichait `tracks?page=X&limit=5` avec un statut `200`.
+4. Demande d’explication du choix du fichier, de `FormData`, du flux et du rôle du Blob par rapport au JWT.
+5. Confirmation des tests d’upload : fichier de plus de 25 Mo refusé avec un message d’erreur, puis petit fichier envoyé avec les champs `audio` et `title`.
+6. Confirmation que la lecture audio répondait `200` avec le JWT dans `Authorization`.
+7. Demande de consigner le travail dans le rapport.
+8. Demande de poursuivre avec les améliorations facultatives et les couvertures; choix validé : filtre côté serveur, suppression avec confirmation, couverture téléversée, et autorisation de modifier le backend et le contrat API.
+
+### Plan proposé et suivi
+1. Lire le sujet TP2, les consignes frontend, le composant de bibliothèque, le service de pistes, le modèle et les endpoints backend correspondants.
+2. Terminer l’affichage des états de pagination et les contrôles de navigation, tout en conservant la pagination côté serveur.
+3. Compléter la validation frontend et les retours d’état du formulaire d’upload.
+4. Compléter l’état de lecture audio, les erreurs, les cartes de pistes et la libération de l’ObjectURL.
+5. Construire le frontend et demander la vérification manuelle des requêtes dans Network.
+
+### Analyse et flux expliqués
+- `tracks-page.html` contient le champ `type="file"` qui déclenche `choose($event)`. La méthode `choose()` dans `tracks-page.ts` récupère le fichier sélectionné.
+- La méthode `upload()` transmet le fichier et le titre à `TrackService.upload()`. Dans `track.service.ts`, le service crée un `FormData`, ajoute les champs requis `audio` et `title`, puis envoie `POST /api/tracks`. L’extension facultative ajoute `cover` lorsqu’une image est choisie.
+- Le backend traite maintenant les fichiers avec `upload.fields()` : `audio` est obligatoire; `cover` est facultatif. Il limite l’audio à 25 Mo, la couverture à 5 Mo et filtre les types MIME acceptés. La signature de l’image est également vérifiée après réception. Ces contrôles restent nécessaires même si le frontend valide aussi les fichiers, car une validation côté navigateur peut être contournée.
+- Pour la lecture, `play(track)` appelle `TrackService.audio(id)`, qui utilise `HttpClient` avec `responseType: 'blob'`. L’intercepteur ajoute le JWT à la requête API protégée; le Blob est la réponse binaire audio, pas le JWT. Le composant crée une ObjectURL pour fournir les octets reçus au lecteur HTML.
+- Une URL placée directement dans `src` d’un élément `<audio>` ne passe pas par `HttpClient` et ne reçoit donc pas automatiquement l’en-tête `Authorization` ajouté par l’intercepteur.
+- Le backend utilise `res.sendFile()` pour envoyer le fichier stocké sur disque. Avec `HttpClient` et `responseType: 'blob'`, le composant reçoit généralement le Blob une fois la réponse téléchargée. La liste ne récupère que les métadonnées; l’audio est demandé à la lecture. Un lecteur HTML pointant directement vers une URL HTTP délègue le chargement et le buffering au navigateur, dont le comportement dépend entre autres de `preload`.
+- Une ObjectURL est révoquée quand elle est remplacée et à la destruction du composant afin de libérer la ressource associée.
+
+### Modifications acceptées
+- `frontend-starter/src/app/components/tracks-page/tracks-page.ts` :
+  - passage explicite de la page et de la limite de cinq pistes à `TrackService.list()` ;
+  - états d’erreur et de chargement pour la bibliothèque, et protection contre les réponses d’une ancienne requête ;
+  - contrôle des limites de pagination ;
+  - validation frontend des types MIME audio acceptés par le backend et de la taille maximale de 25 Mo ;
+  - états de soumission, prévention des doubles envois, retours de succès/erreur et remise à zéro du formulaire après succès ;
+  - état du morceau en cours, erreurs de récupération/lecture et révocation de l’ObjectURL finale à la destruction.
+- `frontend-starter/src/app/components/tracks-page/tracks-page.html` : messages accessibles avec `role="status"`/`role="alert"`, états du formulaire, cartes de pistes et lecteur audio associé au morceau en cours.
+- `frontend-starter/src/app/components/tracks-page/tracks-page.css` : présentation responsive des cartes de bibliothèque.
+- Aucun changement du backend ou du contrat HTTP pour les missions principales; les changements nécessaires aux options facultatives sont documentés séparément ci-dessous.
+
+### Vérifications et commandes lancées
+- `npm run build` depuis `frontend-starter` après la pagination : réussi.
+- Vérification manuelle par l’étudiante dans Network : les changements de page envoient `GET tracks?page=X&limit=5`, réponse `200`.
+- Vérification manuelle par l’étudiante : un fichier de plus de 25 Mo est refusé avec un message d’erreur.
+- Vérification manuelle par l’étudiante : l’upload d’un petit fichier audio envoie correctement les champs multipart `audio` et `title`.
+- `npm run build` après les modifications d’upload : réussi.
+- Vérification manuelle par l’étudiante : la requête audio reçoit `200` et comprend le JWT dans l’en-tête `Authorization`.
+- `npm run build` après les modifications de lecture et des cartes : réussi.
+- `npm test` n’a pas pu démarrer : Angular a signalé l’absence d’un environnement DOM (`jsdom` ou `happy-dom`). Aucun paquet n’a été installé. Aucun fichier de test frontend `*.spec.ts` n’a été trouvé.
+
+### Captures d’écran
+- **Pagination et cartes de bibliothèque** — ![Bibliothèque paginée avec les cartes de pistes](./image-1.png)
+- **Upload multipart dans Network** — ![Requête multipart montrant les champs audio et title](./image-2.png)
+- **Validation de taille** — ![Message affiché pour un fichier dépassant 25 Mo](./image-3.png)
+- **Lecture audio authentifiée** — ![Lecture audio et requête authentifiée avec le JWT masqué](./image-4.png)
+- La valeur du JWT doit rester masquée sur toute capture partagée.
+
+
+### Ce que j’ai compris
+J’ai compris que le choix du fichier est traité par le composant, puis que le service construit le `FormData` et envoie les champs `audio` et `title` à l’API. La validation faite dans le navigateur donne un retour rapide à l’utilisateur, mais le backend doit refaire les contrôles, car il ne peut pas faire confiance au client.
+
+Pour la lecture, le JWT est envoyé dans l’en-tête HTTP par l’intercepteur, tandis que le Blob contient les octets audio reçus. Une ObjectURL permet au lecteur HTML d’utiliser ce Blob. Les fichiers ne sont pas téléchargés au chargement de la liste : seule la piste demandée est récupérée à la lecture. J’ai vérifié dans Network la pagination, l’upload et la requête audio authentifiée.
+
+### Améliorations facultatives — filtre, suppression et couvertures
+- **Choix validé** : filtre par titre côté serveur (combiné à la pagination), suppression avec confirmation, et upload d’une image associée à la piste. L’étudiante a autorisé les changements du backend et du contrat API.
+- **Couverture** : JPEG, PNG ou WebP, 5 Mo maximum. Le backend stocke l’image sur disque, conserve ses métadonnées dans MongoDB et vérifie aussi la signature du fichier. Le nom de stockage n’est pas renvoyé au frontend. `GET /api/tracks/:id/cover` vérifie le JWT et le propriétaire; Angular utilise `HttpClient` pour joindre le JWT, reçoit l’image en Blob et crée une ObjectURL. La suppression d’une piste tente aussi de supprimer sa couverture.
+- **Filtre** : `search` est transmis avec la pagination. Le backend échappe les caractères regex pour effectuer une recherche littérale partielle et insensible à la casse sur le titre.
+- **Suppression** : confirmation native du navigateur, requête `DELETE /api/tracks/:id`, message de résultat et rafraîchissement de la page courante (retour à la page précédente si la dernière piste de la page vient d’être supprimée).
+- **Correction après essai d’upload** : le middleware multipart renvoyait `Too many parts` pour le formulaire audio + titre + couverture. Busboy signale la limite dès que le nombre de parties atteint la valeur configurée; le plafond est donc réglé à 4 pour accepter les trois champs attendus. Les limites indépendantes restent fixées à deux fichiers et un champ texte.
+- **Fichiers modifiés pour ces options** : `API_CONTRACT.md`; `backend/src/app.js`, `backend/src/models/Track.js`, `backend/test/api.test.js`; `frontend-starter/src/app/components/tracks-page/tracks-page.ts`, `tracks-page.html`, `tracks-page.css`; `frontend-starter/src/app/shared/services/track.service.ts` et `shared/models/track.model.ts`.
+- **Validations automatisées** : `npm run build` frontend réussi; `npm test` backend réussi (3 tests); `node --check` sur `backend/src/app.js` et `backend/src/models/Track.js` réussi. Le test ajouté vérifie la protection JWT de la route cover et le fait que le nom de stockage de couverture n’est pas exposé.
+- **Vérification manuelle par l’étudiante** : après le réglage de la limite multipart à 4, l’upload d’une piste avec son champ `cover` fonctionne.
+- **Vérification manuelle par l’étudiante** : le filtre par titre fonctionne, les couvertures s’affichent, et la suppression avec confirmation et rafraîchissement fonctionne.
+- Les captures principales sont ajoutées. Les captures spécifiques au filtre, à l’affichage d’une couverture et à la suppression peuvent être ajoutées si elles sont demandées pour le rendu.

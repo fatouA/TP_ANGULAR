@@ -36,8 +36,18 @@ test("schémas Mongoose et relation", () => {
     storedName: "x.mp3",
     mimeType: "audio/mpeg",
     size: 42,
+    coverStoredName: "x.webp",
+    coverMimeType: "image/webp",
+    coverSize: 64,
   });
   
   assert.equal(t.title, "Blues");
   assert.equal(Track.schema.path("ownerId").options.ref, "User");
+  assert.equal(t.toPublic().coverMimeType, "image/webp");
+  assert.equal(Object.hasOwn(t.toPublic(), "coverStoredName"), false);
+});
+
+test("la route de couverture exige une authentification", async () => {
+  const response = await fetch(`${base}/api/tracks/any/cover`);
+  assert.equal(response.status, 401);
 });

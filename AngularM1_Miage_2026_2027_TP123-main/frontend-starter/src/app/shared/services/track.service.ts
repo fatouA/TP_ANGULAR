@@ -8,16 +8,17 @@ import { Track } from '../models/track.model';
 export class TrackService {
   private readonly http = inject(HttpClient);
 
-  list(page = 1, limit = 5) {
+  list(page = 1, limit = 5, search = '') {
     return this.http.get<Page<Track>>('/api/tracks', {
-      params: { page, limit },
+      params: { page, limit, ...(search ? { search } : {}) },
     });
   }
 
-  upload(file: File, title: string) {
+  upload(file: File, title: string, cover?: File) {
     const body = new FormData();
     body.append('audio', file);
     body.append('title', title);
+    if (cover) body.append('cover', cover);
     return this.http.post<Track>('/api/tracks', body);
   }
 
@@ -25,5 +26,15 @@ export class TrackService {
     return this.http.get(`/api/tracks/${id}/audio`, {
       responseType: 'blob',
     });
+  }
+
+  cover(id: string) {
+    return this.http.get(`/api/tracks/${id}/cover`, {
+      responseType: 'blob',
+    });
+  }
+
+  remove(id: string) {
+    return this.http.delete<void>(`/api/tracks/${id}`);
   }
 }
