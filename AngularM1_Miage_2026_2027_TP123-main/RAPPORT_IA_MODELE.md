@@ -210,6 +210,8 @@ J’ai compris que le choix du fichier est traité par le composant, puis que le
 
 Pour la lecture, le JWT est envoyé dans l’en-tête HTTP par l’intercepteur, tandis que le Blob contient les octets audio reçus. Une ObjectURL permet au lecteur HTML d’utiliser ce Blob. Les fichiers ne sont pas téléchargés au chargement de la liste : seule la piste demandée est récupérée à la lecture. J’ai vérifié dans Network la pagination, l’upload et la requête audio authentifiée.
 
+
+
 ### Améliorations facultatives — filtre, suppression et couvertures
 - **Choix validé** : filtre par titre côté serveur (combiné à la pagination), suppression avec confirmation, et upload d’une image associée à la piste. L’étudiante a autorisé les changements du backend et du contrat API.
 - **Couverture** : JPEG, PNG ou WebP, 5 Mo maximum. Le backend stocke l’image sur disque, conserve ses métadonnées dans MongoDB et vérifie aussi la signature du fichier. Le nom de stockage n’est pas renvoyé au frontend. `GET /api/tracks/:id/cover` vérifie le JWT et le propriétaire; Angular utilise `HttpClient` pour joindre le JWT, reçoit l’image en Blob et crée une ObjectURL. La suppression d’une piste tente aussi de supprimer sa couverture.
@@ -220,4 +222,58 @@ Pour la lecture, le JWT est envoyé dans l’en-tête HTTP par l’intercepteur,
 - **Validations automatisées** : `npm run build` frontend réussi; `npm test` backend réussi (3 tests); `node --check` sur `backend/src/app.js` et `backend/src/models/Track.js` réussi. Le test ajouté vérifie la protection JWT de la route cover et le fait que le nom de stockage de couverture n’est pas exposé.
 - **Vérification manuelle par l’étudiante** : après le réglage de la limite multipart à 4, l’upload d’une piste avec son champ `cover` fonctionne.
 - **Vérification manuelle par l’étudiante** : le filtre par titre fonctionne, les couvertures s’affichent, et la suppression avec confirmation et rafraîchissement fonctionne.
-- Les captures principales sont ajoutées. Les captures spécifiques au filtre, à l’affichage d’une couverture et à la suppression peuvent être ajoutées si elles sont demandées pour le rendu.
+
+### Captures TP3 — suppression d’une piste
+- **Confirmation visuelle après suppression** — ![SnackBar confirmant la suppression de SON3](./captures-tp3/suppression-confirmation.png)
+- **Requête DELETE dans Network** — ![Requête DELETE réussie avec le statut 204 No Content](./captures-tp3/suppression-network-204.png)
+- La capture Network confirme la requête `DELETE` et la réponse `204 No Content`; aucune donnée d’authentification n’est visible.
+
+---
+
+## Note — Installation des dépendances du frontend
+- Une première commande `npm install` destinée à Angular Material/CDK a été lancée par erreur dans le dossier parent du projet. Elle y a créé `node_modules/`, `package.json` et `package-lock.json`.
+- Ces éléments ont été conservés à la demande de l’étudiante. Ils sont séparés du projet `AngularM1_Miage_2026_2027_TP123-main/frontend-starter`, qui possède son propre `package.json`, son `package-lock.json` et ses dépendances locales; ils ne sont pas requis pour exécuter le frontend.
+- Angular Material et CDK ont ensuite été installés dans `frontend-starter` aux versions compatibles avec Angular 22.1.4. C’est cette installation qui est utilisée par l’application.
+
+---
+
+## TP3 — Suppression, progression d’upload et tests automatisés
+* **Date** : 29 octobre 2026
+* **Outil et modèle** : Copilot SDK dans VS Code — modèle utilisé dans l’interface (à compléter).
+* **Objectif** : vérifier la suppression authentifiée d’une piste, traiter les états de progression et d’échec de l’upload, et écrire des tests frontend ciblés indépendants du backend.
+
+### Déroulement et explications
+- La suppression est déclenchée par le composant, qui demande confirmation, empêche une deuxième suppression simultanée et présente le résultat dans un SnackBar. La requête `DELETE /api/tracks/:id` est centralisée dans `TrackService`. Après succès, la liste est rechargée; si le backend renvoie `404` (piste absente ou non accessible), une erreur est affichée et l’utilisateur peut actualiser la liste.
+- Le backend authentifie chaque requête et cherche la piste par identifiant et propriétaire. Le guard et l’interface Angular ne remplacent pas cette vérification serveur.
+- L’upload utilise les événements HTTP Angular. Le composant met à jour le pourcentage à partir de `loaded / total`; si `total` n’est pas communiqué, la progression est indéterminée. En cas d’erreur HTTP ou de coupure, l’envoi s’arrête, la barre disparaît, le message d’erreur s’affiche et le titre/fichier restent sélectionnés pour permettre un nouvel essai. Après succès, le formulaire est réinitialisé.
+- Les tests frontend utilisent `HttpTestingController` pour intercepter les requêtes et fournir des réponses simulées; ils n’ont donc besoin ni d’Express ni de MongoDB.
+
+### Fichiers TP3 concernés
+- `frontend-starter/src/app/components/tracks-page/tracks-page.ts` et `tracks-page.html` : confirmation/état de suppression, notifications SnackBar, message pour les erreurs HTTP 403/404, progression et états d’erreur/succès de l’upload.
+- `frontend-starter/src/app/shared/services/track.service.ts` : `DELETE` centralisé et upload observé sous forme d’événements HTTP avec `reportProgress`.
+- `frontend-starter/src/app/shared/services/track.service.spec.ts` : tests du listing paginé/filtré, suppression, en-tête de l’intercepteur et événements d’upload.
+- `frontend-starter/package.json` et `package-lock.json` : Angular Material/CDK alignés sur Angular 22.1.4 et `happy-dom` pour l’environnement des tests.
+- `frontend-starter/angular.json` : configuration `development` requise par le runner de test.
+- `frontend-starter/src/styles.css` : thème Angular Material pour le SnackBar.
+- Aucun changement backend n’a été nécessaire pour ces missions.
+
+### Vérifications et résultats
+- `npm test` depuis `frontend-starter` : **4 tests réussis**.
+- `npm run build` depuis `frontend-starter` : **réussi**.
+- `npm test` depuis `backend` : **3 tests réussis**.
+- Vérification manuelle effectuée par l’étudiante : suppression confirmée dans l’interface et dans Network; la requête `DELETE` retourne `204 No Content`. Captures dans `captures-tp3/`.
+- **Vérification manuelle de l’upload** : l’étudiante a réglé le throttling de Network sur « 3G » pour ralentir l’envoi et rendre la progression visible. La capture montre l’upload actif à 0 % et les contrôles du formulaire désactivés (voir `captures-tp3/upload-progression-3g.png`). Après l’envoi, la piste apparaît dans la liste; aucune capture supplémentaire de la réponse finale n’est jugée nécessaire par l’étudiante. Les tests simulent les événements et la capture documente l’état de progression.
+- La capture Network d’upload déjà présente dans la section TP2 ([image-2.png](./image-2.png)) montre la requête multipart avec les champs `audio` et `title`; elle complète la capture d’interface de progression 3G. La capture Network de suppression est `captures-tp3/suppression-network-204.png`.
+
+### Rapport détaillé des tests frontend
+| Test | Résultat attendu | Résultat observé |
+|---|---|---|
+| Liste avec pagination et recherche | `GET /api/tracks` contient `page=2`, `limit=5`, `search=blues`; la page simulée contient une piste. | URL, méthode, paramètres vérifiés; une piste reçue. Réussi. |
+| Suppression | `DELETE /api/tracks/track-1`; l’observable se termine après la réponse `204`. | Méthode et URL vérifiées; complétion observée après la réponse simulée. Réussi. |
+| Intercepteur | Une requête protégée inclut l’en-tête `Authorization` avec le préfixe `Bearer` et le jeton de test. | En-tête vérifié sur la requête interceptée. Réussi. |
+| Upload avec progression | `POST /api/tracks` contient `FormData` (`audio`, `title`), active `reportProgress` et émet progression puis réponse finale. | Méthode, corps et option vérifiés; événements `Sent`, `UploadProgress` (50 %) puis `Response` observés. Réussi. |
+
+### Compréhension à restituer
+Les tests HTTP simulés contrôlent ce que le frontend envoie (méthode, URL, paramètres, headers et corps) et comment il reçoit les événements/réponses; ils ne valident pas l’intégration réelle avec le backend. Un test d’intégration relie plusieurs parties du système (par exemple frontend, API et base de données), tandis que ces tests ciblés isolent surtout le service et l’intercepteur.
+
+L’étudiante a expliqué que `HttpTestingController` intercepte les appels Angular et fournit une réponse simulée, ce qui permet de tester sans serveur ni MongoDB.

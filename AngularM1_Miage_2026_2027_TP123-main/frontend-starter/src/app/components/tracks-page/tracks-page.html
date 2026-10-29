@@ -28,7 +28,13 @@
         <p role="status">{{ uploadSuccess() }}</p>
       }
       @if (uploading()) {
-        <p role="status">Envoi du fichier audio en cours…</p>
+        <progress [attr.value]="uploadProgress() ?? null" max="100"
+          aria-label="Progression du téléversement"></progress>
+        <p role="status">
+          {{ uploadProgress() === null
+            ? 'Envoi du fichier audio en cours…'
+            : 'Envoi du fichier audio : ' + uploadProgress() + '%' }}
+        </p>
       }
     </article>
 
@@ -77,7 +83,7 @@
               [attr.aria-label]="'Lire ' + track.title">
               {{ currentTrack()?.id === track.id && audioLoading() ? 'Chargement…' : 'Lire' }}
             </button>
-            <button type="button" (click)="remove(track)" [disabled]="deletingTrackId() === track.id"
+            <button type="button" (click)="remove(track)" [disabled]="!!deletingTrackId()"
               [attr.aria-label]="'Supprimer ' + track.title">
               {{ deletingTrackId() === track.id ? 'Suppression…' : 'Supprimer' }}
             </button>

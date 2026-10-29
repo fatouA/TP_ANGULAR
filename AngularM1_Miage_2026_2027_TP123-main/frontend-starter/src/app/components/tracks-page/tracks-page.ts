@@ -1,16 +1,18 @@
 import { Component, inject, OnDestroy, signal } from '@angular/core';
-import { HttpErrorResponse } from '@angular/common/http';
+import { HttpErrorResponse, HttpEventType, HttpResponse } from '@angular/common/http';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
+import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { Track } from '../../shared/models/track.model';
 import { TrackService } from '../../shared/services/track.service';
 
 @Component({
-  imports: [ReactiveFormsModule],
+  imports: [ReactiveFormsModule, MatSnackBarModule],
   templateUrl: './tracks-page.html',
   styleUrl: './tracks-page.css',
 })
 export class TracksPageComponent implements OnDestroy {
   private readonly service = inject(TrackService);
+  private readonly snackBar = inject(MatSnackBar);
   private readonly maxFileSize = 25 * 1024 * 1024;
   private readonly acceptedAudioTypes = new Set([
     'audio/mpeg',
@@ -30,6 +32,7 @@ export class TracksPageComponent implements OnDestroy {
   readonly loading = signal(false);
   readonly error = signal('');
   readonly uploading = signal(false);
+  readonly uploadProgress = signal<number | null>(null);
   readonly uploadError = signal('');
   readonly uploadSuccess = signal('');
   readonly deleteError = signal('');
@@ -61,6 +64,7 @@ export class TracksPageComponent implements OnDestroy {
     this.file = input.files?.[0];
     this.uploadError.set('');
     this.uploadSuccess.set('');
+    this.uploadProgress.set(null);
 
     if (this.file) {
       const validationError = this.validateFile(this.file);
@@ -79,6 +83,7 @@ export class TracksPageComponent implements OnDestroy {
     this.coverFile = input.files?.[0];
     this.uploadError.set('');
     this.uploadSuccess.set('');
+    this.uploadProgress.set(null);
 
     if (!this.coverFile) return;
     if (this.coverFile.size > this.maxCoverSize) {
@@ -164,10 +169,30 @@ export class TracksPageComponent implements OnDestroy {
     this.uploadError.set('');
     this.uploadSuccess.set('');
     this.uploading.set(true);
+    this.uploadProgress.set(0);
     this.service.upload(file, this.title.value.trim() || file.name, cover).subscribe({
-      next: (track) => {
+      next: (event) => {
+        if (event.type === HttpEventType.UploadProgress) {
+          this.uploadProgress.set(
+            event.total === undefined || event.total === 0
+              ? null
+              : Math.round((event.loaded / event.total) * 100),
+          );
+          return;
+        }
+        if (!(event instanceof HttpResponse)) return;
+
+        const track = event.body;
+        if (!track) {
+          this.uploading.set(false);
+          this.uploadProgress.set(null);
+          this.uploadError.set('Le serveur a terminé l’envoi sans renvoyer la piste.');
+          return;
+        }
+
         console.debug('[TracksPage] Piste envoyée', track.id);
         this.uploading.set(false);
+        this.uploadProgress.set(100);
         this.uploadSuccess.set(
           cover
             ? 'La piste et sa couverture ont été envoyées avec succès.'
@@ -184,6 +209,7 @@ export class TracksPageComponent implements OnDestroy {
       error: (error: unknown) => {
         console.error('[TracksPage] Envoi impossible', error);
         this.uploading.set(false);
+        this.uploadProgress.set(null);
         this.uploadError.set(this.getRequestErrorMessage(error));
       },
     });
@@ -201,6 +227,10 @@ export class TracksPageComponent implements OnDestroy {
       next: () => {
         this.deletingTrackId.set('');
         this.deleteSuccess.set(`« ${track.title} » a été supprimée.`);
+        this.snackBar.open(`« ${track.title} » a été supprimée.`, 'Fermer', {
+          duration: 5000,
+          politeness: 'polite',
+        });
         if (this.currentTrack()?.id === track.id) {
           const audioUrl = this.audioUrl();
           if (audioUrl) URL.revokeObjectURL(audioUrl);
@@ -216,7 +246,15 @@ export class TracksPageComponent implements OnDestroy {
       error: (error: unknown) => {
         console.error('[TracksPage] Suppression impossible', error);
         this.deletingTrackId.set('');
-        this.deleteError.set(this.getRequestErrorMessage(error));
+        const message =
+          error instanceof HttpErrorResponse && (error.status === 403 || error.status === 404)
+            ? 'Cette piste n’existe plus ou n’est pas accessible à votre compte. Actualisez la bibliothèque.'
+            : this.getRequestErrorMessage(error);
+        this.deleteError.set(message);
+        this.snackBar.open(message, 'Fermer', {
+          duration: 7000,
+          politeness: 'assertive',
+        });
       },
     });
   }

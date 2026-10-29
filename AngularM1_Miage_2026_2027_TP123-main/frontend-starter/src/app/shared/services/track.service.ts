@@ -19,7 +19,10 @@ export class TrackService {
     body.append('audio', file);
     body.append('title', title);
     if (cover) body.append('cover', cover);
-    return this.http.post<Track>('/api/tracks', body);
+    return this.http.post<Track>('/api/tracks', body, {
+      observe: 'events',
+      reportProgress: true,
+    });
   }
 
   audio(id: string) {
